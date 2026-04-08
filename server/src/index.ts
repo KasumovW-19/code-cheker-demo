@@ -30,14 +30,14 @@ async function createUniqueCode() {
       })
 
       return created
-    } catch (error) {
+    } catch (error: unknown) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
         continue
       }
-
+    
       throw error
     }
   }
