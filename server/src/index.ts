@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import path from 'path'
 import { prisma } from './prisma'
 import { Prisma } from '../generated/prisma/client'
 
@@ -210,7 +211,15 @@ app.delete('/api/admin/codes/:id', async (req, res) => {
   }
 })
 
-const port = 4000
+const clientDistPath = path.join(path.resolve(), '../client/dist')
+
+app.use(express.static(clientDistPath))
+
+app.get(/^(?!\/api).*/, (_, res) => {
+  res.sendFile(path.join(clientDistPath, 'index.html'))
+})
+
+const port = Number(process.env.PORT) || 4000
 
 app.listen(port, () => {
   console.log(`Server started on http://localhost:${port}`)
