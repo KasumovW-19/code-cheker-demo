@@ -1,11 +1,46 @@
 import express from 'express'
 import cors from 'cors'
 import { prisma } from './prisma'
+import { Prisma } from '../generated/prisma/client'
 
 const app = express()
 
 app.use(cors())
 app.use(express.json())
+
+function generateCode(length = 8) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let result = ''
+
+  for (let i = 0; i < length; i += 1) {
+    result += chars[Math.floor(Math.random() * chars.length)]
+  }
+
+  return result
+}
+
+async function createUniqueCode() {
+  while (true) {
+    const code = generateCode(8)
+
+    try {
+      const created = await prisma.code.create({
+        data: { code }
+      })
+
+      return created
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        continue
+      }
+
+      throw error
+    }
+  }
+}
 
 app.get('/api/health', (_, res) => {
   res.json({ ok: true })
@@ -76,6 +111,101 @@ app.post('/api/code/activate', async (req, res) => {
       success: false,
       reason: 'server_error',
       message: 'Ошибка сервера'
+    })
+  }
+})
+
+app.get('/api/admin/codes', async (_, res) => {
+  try {
+    const codes = await prisma.code.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
+
+    return res.json({
+      success: true,
+      items: codes
+    })
+  } catch (error) {
+    console.error(error)
+
+    return res.status(500).json({
+      success: false,
+      message: 'Не удалось получить список кодов'
+    })
+  }
+})
+
+app.post('/api/admin/codes', async (req, res) => {
+  try {
+    const rawCount = req.body?.count
+    const count = typeof rawCount === 'number' ? rawCount : 1
+
+    if (!Number.isInteger(count) || count < 1 || count > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'count должен быть целым числом от 1 до 100'
+      })
+    }
+
+    const createdItems = []
+
+    for (let i = 0; i < count; i += 1) {
+      const created = await createUniqueCode()
+      createdItems.push(created)
+    }
+
+    return res.status(201).json({
+      success: true,
+      items: createdItems
+    })
+  } catch (error) {
+    console.error(error)
+
+    return res.status(500).json({
+      success: false,
+      message: 'Не удалось создать коды'
+    })
+  }
+})
+
+app.delete('/api/admin/codes/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Некорректный id'
+      })
+    }
+
+    const existing = await prisma.code.findUnique({
+      where: { id }
+    })
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Код не найден'
+      })
+    }
+
+    await prisma.code.delete({
+      where: { id }
+    })
+
+    return res.json({
+      success: true,
+      message: 'Код удалён'
+    })
+  } catch (error) {
+    console.error(error)
+
+    return res.status(500).json({
+      success: false,
+      message: 'Не удалось удалить код'
     })
   }
 })
