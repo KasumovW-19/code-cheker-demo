@@ -15,17 +15,33 @@ export default function App() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+
+    const normalizedCode = code.trim().toUpperCase()
+
+    if (!normalizedCode) {
+      setIsError(true)
+      setMessage('Введите код')
+      return
+    }
+
     setMessage(null)
     setLoading(true)
+
     try {
       const res = await fetch('/api/code/activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code: normalizedCode }),
       })
+
       const data = (await res.json()) as ActivateResponse
+
       setIsError(!data.success)
       setMessage(data.message)
+
+      if (data.success) {
+        setCode('')
+      }
     } catch {
       setIsError(true)
       setMessage('Не удалось связаться с сервером')
@@ -38,6 +54,7 @@ export default function App() {
     <main className="app">
       <h1>Активация кода</h1>
       <p className="lead">Введите код доступа</p>
+
       <form className="form" onSubmit={handleSubmit}>
         <label className="field">
           <span className="label">Код</span>
@@ -51,12 +68,21 @@ export default function App() {
             disabled={loading}
           />
         </label>
-        <button type="submit" className="submit" disabled={loading}>
+
+        <button
+          type="submit"
+          className="submit"
+          disabled={loading || !code.trim()}
+        >
           {loading ? 'Проверка…' : 'Активировать'}
         </button>
       </form>
+
       {message != null && (
-        <p className={`feedback ${isError ? 'error' : 'ok'}`} role="status">
+        <p
+          className={`feedback ${isError ? 'error' : 'ok'}`}
+          aria-live="polite"
+        >
           {message}
         </p>
       )}
